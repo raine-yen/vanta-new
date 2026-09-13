@@ -43,6 +43,7 @@ export interface DetailedQuote extends PriceQuote {
 }
 
 const CACHE_TTL_MS = 5_000;
+const QUOTE_TIMEOUT_MS = 3_500;
 const memCache = new Map<string, { price: number; prevClose: number | null; ts: number }>();
 
 export type ChartRange = "1h" | "1d" | "5d" | "1mo" | "3mo" | "6mo" | "1y";
@@ -93,7 +94,7 @@ function stateFromTradingPeriod(meta: Record<string, unknown>): MarketState {
 async function yahooQuote(symbol: string): Promise<PriceQuote | null> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d&includePrePost=true`;
   try {
-    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 } });
+    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 }, signal: AbortSignal.timeout(QUOTE_TIMEOUT_MS) });
     if (!res.ok) return null;
     const json = await res.json();
     const meta = json?.chart?.result?.[0]?.meta as Record<string, unknown> | undefined;
@@ -128,7 +129,7 @@ async function yahooSnapshot(symbols: string[]): Promise<Map<string, DetailedQuo
   const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(deduped.join(","))}`;
 
   try {
-    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 } });
+    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 }, signal: AbortSignal.timeout(QUOTE_TIMEOUT_MS) });
     if (!res.ok) return out;
     const json = await res.json();
     const results = json?.quoteResponse?.result;
