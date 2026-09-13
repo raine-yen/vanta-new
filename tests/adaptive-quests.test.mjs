@@ -4,9 +4,13 @@ import { getAdaptiveQuests, getDailyQuestCycle } from "../src/lib/adaptive-quest
 
 const emptyStats = { lifetimeOrders: 0, filledOrders: 0, uniqueSymbols: 0, buyOrders: 0, sellOrders: 0, limitOrders: 0, predictionTrades: 0 };
 
-test("daily quest cycle changes with the calendar day", () => {
-  assert.equal(getDailyQuestCycle(new Date("2026-09-12T23:59:59Z")).id, "daily-2026-09-12");
-  assert.equal(getDailyQuestCycle(new Date("2026-09-13T00:00:00Z")).id, "daily-2026-09-13");
+test("daily quest cycle resets at Pacific local midnight", () => {
+  const beforeMidnight = getDailyQuestCycle(new Date("2026-09-13T06:59:59Z"));
+  const afterMidnight = getDailyQuestCycle(new Date("2026-09-13T07:00:00Z"));
+  assert.equal(beforeMidnight.id, "daily-2026-09-12");
+  assert.equal(afterMidnight.id, "daily-2026-09-13");
+  assert.equal(afterMidnight.startsAt, "2026-09-13T07:00:00.000Z");
+  assert.equal(afterMidnight.endsAt, "2026-09-14T07:00:00.000Z");
 });
 
 test("quest difficulty rises with completed-order experience while progress stays daily", () => {

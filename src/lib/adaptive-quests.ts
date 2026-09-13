@@ -2,10 +2,31 @@ export type QuestTier = "starter" | "active" | "advanced";
 
 export type AdaptiveQuest = { id: string; title: string; description: string; progress: number; goal: number; reward: string };
 export type DailyQuestStats = { lifetimeOrders: number; filledOrders: number; uniqueSymbols: number; buyOrders: number; sellOrders: number; limitOrders: number; predictionTrades: number };
+export type DailyQuestCycle = { id: string; label: string; startsAt: string; endsAt: string };
+
+const QUEST_TIME_ZONE = "America/Los_Angeles";
+const dateFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: QUEST_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: QUEST_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", minute: "2-digit", second: "2-digit" });
+
+function localDateKey(date: Date) {
+  const values = Object.fromEntries(dateFormatter.formatToParts(date).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function pacificMidnight(date: string) {
+  const candidate = new Date(`${date}T00:00:00.000Z`);
+  const parts = Object.fromEntries(dateTimeFormatter.formatToParts(candidate).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const displayedAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+  return new Date(candidate.getTime() - (displayedAsUtc - candidate.getTime()));
+}
 
 export function getDailyQuestCycle(now = new Date()) {
-  const date = now.toISOString().slice(0, 10);
-  return { id: `daily-${date}`, label: date };
+  const date = localDateKey(now);
+  const [year, month, day] = date.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+  const startsAt = pacificMidnight(date).toISOString();
+  const endsAt = pacificMidnight(nextDate.toISOString().slice(0, 10)).toISOString();
+  return { id: `daily-${date}`, label: date, startsAt, endsAt } satisfies DailyQuestCycle;
 }
 
 export function getQuestTier(lifetimeOrders: number): QuestTier {

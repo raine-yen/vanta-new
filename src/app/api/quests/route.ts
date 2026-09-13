@@ -7,9 +7,8 @@ const REWARD_POINTS = 200; // recognition points only — never account cash
 
 async function questState(db: SupabaseClient, accountId: string) {
   const cycle = getDailyQuestCycle();
-  const dayStart = new Date(`${cycle.label}T00:00:00.000Z`);
-  const start = dayStart.toISOString();
-  const end = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const start = cycle.startsAt;
+  const end = cycle.endsAt;
   const [todayOrdersResult, totalOrdersResult, predictionResult, claimsResult] = await Promise.all([
     db.from("orders").select("symbol, side, type, status").eq("account_id", accountId).gte("created_at", start).lt("created_at", end),
     db.from("orders").select("id", { count: "exact", head: true }).eq("account_id", accountId),
