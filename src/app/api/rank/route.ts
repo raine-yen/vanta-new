@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/session-user";
 import { calculateInvestedPerformance } from "@/lib/performance";
 import { rankForAccount, rankMovement } from "@/lib/ranks";
 import { fetchYahooPrices } from "@/lib/prices";
+import { getCurrentAccount } from "@/lib/app-data";
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
@@ -17,15 +18,10 @@ export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get("account_id");
   if (!accountId) return NextResponse.json({ error: "account_id is required" }, { status: 400 });
 
-  const db = supabaseAdmin();
-  const { data: viewerAccount } = await db
-    .from("accounts")
-    .select("competition_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!viewerAccount) return NextResponse.json({ error: "no account" }, { status: 400 });
+  const context = await getCurrentAccount(req);
+  if ("response" in context) return context.response;
+  const db = context.db;
+  const viewerAccount = context.account;
 
   const { data: target, error: tErr } = await db
     .from("accounts")

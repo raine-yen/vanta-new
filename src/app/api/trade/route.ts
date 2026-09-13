@@ -1,10 +1,9 @@
 // Browser-facing trade endpoint — uses session, not API key
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { placeOrder } from "@/lib/engine";
 import { toAlpacaOrder } from "@/lib/alpaca-format";
-import { getSessionUser } from "@/lib/session-user";
+import { getCurrentAccount } from "@/lib/app-data";
 
 const tradeSchema = z.object({
   symbol: z.string().min(1),
@@ -18,8 +17,8 @@ const tradeSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser(req);
-    if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const context = await getCurrentAccount(req);
+    if ("response" in context) return context.response;
 
     const body = await req.json().catch(() => null);
     const parsed = tradeSchema.safeParse(body);
@@ -27,20 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
     }
 
-    const db = supabaseAdmin();
-    const { data: account, error: accountError } = await db
-      .from("accounts")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (accountError) {
-      console.error("paper trade account lookup failed", accountError);
-      return NextResponse.json({ error: "Your paper account is temporarily unavailable." }, { status: 503 });
-    }
-    if (!account) return NextResponse.json({ error: "no account" }, { status: 400 });
+    const account = context.account;
 
     const order = await placeOrder({
       account,

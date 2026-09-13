@@ -4,6 +4,7 @@ import { fetchYahooPrices } from "@/lib/prices";
 import { getSessionUser } from "@/lib/session-user";
 import { calculateInvestedPerformance } from "@/lib/performance";
 import { rankForAccount, rankMovement, type RankMovement } from "@/lib/ranks";
+import { getCurrentAccount } from "@/lib/app-data";
 
 const RECOMPUTE_COOLDOWN_MS = 60_000;
 const lastRecompute = new Map<string, number>();
@@ -18,6 +19,7 @@ interface StandingRow {
   cost_basis: number;
   gain_amount: number;
   return_pct: number;
+  score: number;
   invested_growth_pct: number;
   position: number;
   /** Internal-only: used to persist ranks/rank_history, stripped before the response goes out. */
@@ -110,15 +112,10 @@ async function recomputeRanks(competitionId: string, standings: StandingRow[]): 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const db = supabaseAdmin();
-  const { data: viewerAccount } = await db
-    .from("accounts")
-    .select("competition_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!viewerAccount) return NextResponse.json({ entries: [] });
+  const context = await getCurrentAccount(req);
+  if ("response" in context) return context.response;
+  const db = context.db;
+  const viewerAccount = context.account;
 
   const accountQuery = db
     .from("accounts")
@@ -130,6 +127,8 @@ export async function GET(req: NextRequest) {
   const { data: accounts, error: acctErr } = await accountQuery;
   if (acctErr) return NextResponse.json({ error: acctErr.message }, { status: 500 });
   if (!accounts || accounts.length === 0) return NextResponse.json({ entries: [] });
+  const scoringResult = await db.from("competitions").select("scoring_method").eq("id", viewerAccount.competition_id).maybeSingle();
+  const scoringMethod = scoringResult.error ? "return_pct" : scoringResult.data?.scoring_method === "net_profit" ? "net_profit" : "return_pct";
 
   // Fetch all positions for these accounts (include avg_entry_price as price fallback)
   const accountIds = (accounts as { id: string }[]).map((a) => a.id);
@@ -200,6 +199,7 @@ export async function GET(req: NextRequest) {
         cost_basis: performance.cost_basis,
         gain_amount: performance.gain_amount,
         return_pct: rank.returnPct,
+        score: scoringMethod === "net_profit" ? liveEquity - Number(a.starting_cash) : rank.returnPct,
         invested_growth_pct: performance.growth_pct,
         position: 0,
         _tier: rank.tier,
@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
         _movement_amount: 0,
       };
     })
-    .sort((a, b) => b.return_pct - a.return_pct);
+    .sort((a, b) => b.score - a.score);
 
   standings.forEach((entry, index) => {
     entry.position = index + 1;
@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
   // per product decision — the list itself must not show rank badges.
   const entries = standings.map(({ _tier, _tier_name, _division, _rank_points, _movement, _movement_amount, ...rest }) => rest);
 
-  return NextResponse.json({ entries });
+  return NextResponse.json({ entries, scoring_method: scoringMethod });
 }
 
 export const dynamic = "force-dynamic";

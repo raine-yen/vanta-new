@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Users, TrendingUp, DollarSign, BarChart2,
   RotateCcw, BanIcon, CheckCircle, AlertTriangle, Timer, Trash2,
@@ -153,7 +154,7 @@ export default function AdminPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold">Admin Panel</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Manage all accounts and competitions</p>
+        <div className="mt-1 flex flex-wrap items-center gap-3"><p className="text-sm text-gray-400">Manage all accounts and competitions</p><Link href="/admin/competitions" className="text-xs font-bold text-accent-green hover:text-white">Competition studio</Link></div>
       </div>
 
       {/* Action result banner */}

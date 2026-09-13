@@ -10,7 +10,7 @@ const DESKTOP_NAV_ITEMS = [
   { href: "/dashboard", label: "Investing", icon: TrendingUp },
   { href: "/market", label: "Discover", icon: Compass },
   { href: "/predictions", label: "Predictions", icon: Target },
-  { href: "/leaderboard", label: "Compete", icon: Trophy },
+  { href: "/competitions", label: "Compete", icon: Trophy },
   { href: "/settings", label: "Account", icon: UserRound },
 ];
 
@@ -18,7 +18,7 @@ const MOBILE_NAV_ITEMS = [
   { href: "/dashboard", label: "Investing", icon: TrendingUp },
   { href: "/market", label: "Search", icon: Search },
   { href: "/predictions", label: "Predictions", icon: Target },
-  { href: "/leaderboard", label: "Compete", icon: Trophy },
+  { href: "/competitions", label: "Compete", icon: Trophy },
   { href: "/settings", label: "Account", icon: UserRound },
 ];
 

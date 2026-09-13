@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseForRequest } from "@/lib/supabase/request";
 import { fetchYahooPrices } from "@/lib/prices";
 import { getSessionUser } from "@/lib/session-user";
-import { isMissingTableError } from "@/lib/app-data";
+import { getSelectedCompetitionAccount, isMissingTableError } from "@/lib/app-data";
 import { isAdminEmail } from "@/lib/admin";
 import { calculateInvestedPerformance } from "@/lib/performance";
 import { ensurePaperAccount } from "@/lib/ensure-paper-account";
@@ -25,13 +25,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { data: account } = await db
-    .from("accounts")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: account } = await getSelectedCompetitionAccount(db, user.id, req.cookies.get("vanta_competition")?.value);
 
   if (!account) return NextResponse.json({ account: null });
 

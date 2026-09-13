@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/session-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SessionAccount = {
   id: string;
@@ -10,7 +11,8 @@ export type SessionAccount = {
   cash: number;
   starting_cash: number;
   equity: number;
-  status: string;
+  status: "active" | "disabled";
+  created_at: string;
 };
 
 export function isMissingTableError(error: unknown) {
@@ -21,18 +23,22 @@ export function isMissingTableError(error: unknown) {
   return message.includes("schema cache") || message.includes("does not exist") || message.includes("relation");
 }
 
+/** Resolve a member's selected competition without ever trusting the browser
+ * cookie as authorization. The lookup always includes the signed-in user. */
+export async function getSelectedCompetitionAccount(db: SupabaseClient, userId: string, competitionId?: string | null) {
+  if (competitionId) {
+    const selected = await db.from("accounts").select("*").eq("user_id", userId).eq("competition_id", competitionId).maybeSingle();
+    if (!selected.error && selected.data) return selected;
+  }
+  return db.from("accounts").select("*").eq("user_id", userId).order("created_at", { ascending: true }).limit(1).maybeSingle();
+}
+
 export async function getCurrentAccount(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) return { response: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };
 
   const db = supabaseAdmin();
-  const { data: account, error } = await db
-    .from("accounts")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: account, error } = await getSelectedCompetitionAccount(db, user.id, req.cookies.get("vanta_competition")?.value);
 
   if (error) return { response: NextResponse.json({ error: error.message }, { status: 500 }) };
   if (!account) return { response: NextResponse.json({ error: "no paper account" }, { status: 403 }) };

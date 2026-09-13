@@ -3,9 +3,8 @@
 // the shared paper cash.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sellPredictionShares } from "@/lib/prediction-engine";
-import { getSessionUser } from "@/lib/session-user";
+import { getCurrentAccount } from "@/lib/app-data";
 
 const closeSchema = z
   .object({
@@ -20,8 +19,8 @@ const closeSchema = z
   });
 
 export async function POST(req: NextRequest) {
-  const user = await getSessionUser(req);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const context = await getCurrentAccount(req);
+  if ("response" in context) return context.response;
 
   const body = await req.json().catch(() => null);
   const parsed = closeSchema.safeParse(body);
@@ -29,15 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
   }
 
-  const db = supabaseAdmin();
-  const { data: account } = await db
-    .from("accounts")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!account) return NextResponse.json({ error: "no account" }, { status: 400 });
+  const account = context.account;
 
   const r = await sellPredictionShares({
     accountId: account.id,
