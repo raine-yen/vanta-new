@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Compass, LogOut, Search, Target, Trophy, TrendingUp, UserRound } from "lucide-react";
+import { Compass, LogOut, Medal, MessageCircle, Search, Target, Trophy, TrendingUp, UserRound } from "lucide-react";
 import { ThemeSelector } from "@/components/theme-selector";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,8 @@ const DESKTOP_NAV_ITEMS = [
   { href: "/market", label: "Discover", icon: Compass },
   { href: "/predictions", label: "Predictions", icon: Target },
   { href: "/competitions", label: "Compete", icon: Trophy },
+  { href: "/leaderboard", label: "Leaderboard", icon: Medal },
+  { href: "/messages", label: "Messages", icon: MessageCircle },
   { href: "/settings", label: "Account", icon: UserRound },
 ];
 
@@ -45,6 +47,7 @@ export function Nav({ email }: { email?: string }) {
         </Link>
         <div className="flex items-center gap-1">
           <Link href="/market" className="vanta-icon-button" aria-label="Search markets"><Search className="h-5 w-5" /></Link>
+          <Link href="/messages" className="vanta-icon-button" aria-label="Messages"><MessageCircle className="h-5 w-5" /></Link>
           <ThemeSelector compact />
         </div>
       </header>

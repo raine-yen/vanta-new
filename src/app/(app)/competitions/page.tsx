@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Loader2, Lock, Trophy, Users } from "lucide-react";
+import { CalendarDays, Loader2, Lock, Medal, MessageCircle, Trophy, Users } from "lucide-react";
 import { formatUSD } from "@/lib/utils";
 
 type Competition = {
@@ -41,7 +41,7 @@ export default function CompetitionsPage() {
   }
 
   return <section className="mx-auto max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:px-10" aria-labelledby="competitions-heading">
-    <header className="border-b border-bg-border pb-5"><p className="text-xs font-bold tracking-[0.16em] text-accent-green">CLUB COMPETITIONS</p><h1 id="competitions-heading" className="mt-2 text-3xl font-black tracking-tight">Choose your next paper challenge.</h1><p className="mt-2 max-w-2xl text-sm text-gray-500">Every competition has its own simulated starting balance, trades, and standings. Prize details are managed by the club outside Vanta.</p></header>
+    <header className="border-b border-bg-border pb-5"><p className="text-xs font-bold tracking-[0.16em] text-accent-green">CLUB COMPETITIONS</p><div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 id="competitions-heading" className="text-3xl font-black tracking-tight">Choose your next paper challenge.</h1><p className="mt-2 max-w-2xl text-sm text-gray-500">Every competition has its own simulated starting balance, trades, and standings. Prize details are managed by the club outside Vanta.</p></div><div className="grid grid-cols-2 gap-2 sm:min-w-[280px]"><Link href="/leaderboard" className="flex min-h-11 items-center justify-center gap-2 border border-bg-border px-3 text-sm font-bold transition-colors hover:border-accent-green hover:text-accent-green"><Medal className="h-4 w-4" /> Leaderboard</Link><Link href="/messages" className="flex min-h-11 items-center justify-center gap-2 border border-bg-border px-3 text-sm font-bold transition-colors hover:border-accent-green hover:text-accent-green"><MessageCircle className="h-4 w-4" /> Messages</Link></div></div></header>
     {message ? <p role="status" className="mt-4 border border-accent-green/40 bg-accent-green/10 p-3 text-sm text-accent-green">{message}</p> : null}
     {loading ? <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading competitions</div> : items.length ? <div className="mt-6 grid gap-4 md:grid-cols-2">{items.map((competition) => {
       const selectable = competition.status === "open" || competition.status === "active";

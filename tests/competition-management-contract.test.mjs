@@ -16,16 +16,20 @@ test("competition migration supports a bounded paper-only lifecycle", async () =
 });
 
 test("competition selection scopes accounts, messages, and market access", async () => {
-  const [appData, messages, trades, predictions, competitions] = await Promise.all([
+  const [appData, messages, trades, predictions, competitions, navigation] = await Promise.all([
     read("src/lib/app-data.ts"),
     read("src/app/api/messages/route.ts"),
     read("src/app/api/trade/route.ts"),
     read("src/app/api/predictions/trade/route.ts"),
     read("src/app/(app)/competitions/page.tsx"),
+    read("src/components/nav.tsx"),
   ]);
   assert.match(appData, /vanta_competition/);
   assert.match(messages, /eq\("competition_id", ctx\.account\.competition_id\)/);
   assert.match(trades, /competition\.status !== "active"/);
   assert.match(predictions, /competition\.status !== "active"/);
   assert.match(competitions, /href="\/messages"/);
+  assert.match(competitions, /href="\/leaderboard"/);
+  assert.match(navigation, /href: "\/leaderboard", label: "Leaderboard"/);
+  assert.match(navigation, /href: "\/messages", label: "Messages"/);
 });
