@@ -12,6 +12,7 @@ interface Entry {
   cost_basis: number;
   gain_amount: number;
   return_pct: number;
+  score: number;
   invested_growth_pct?: number;
   position?: number;
 }
@@ -129,6 +130,7 @@ export default function LeaderboardPage() {
   const [rankError, setRankError] = useState("");
   const [myRank, setMyRank] = useState<RankDetail | null>(null);
   const [myRankLoading, setMyRankLoading] = useState(true);
+  const [scoringMethod, setScoringMethod] = useState<"return_pct" | "net_profit">("return_pct");
 
   useEffect(() => {
     let active = true;
@@ -157,6 +159,7 @@ export default function LeaderboardPage() {
       const j = await r.json();
       if (active) {
         setEntries(j.entries ?? []);
+        setScoringMethod(j.scoring_method === "net_profit" ? "net_profit" : "return_pct");
         setLoading(false);
         setLastUpdated(new Date());
       }
@@ -170,7 +173,9 @@ export default function LeaderboardPage() {
   }, []);
 
   const podium = entries.slice(0, 3);
-  const avgReturn = useMemo(() => entries.length ? entries.reduce((sum, e) => sum + Number(e.return_pct), 0) / entries.length : 0, [entries]);
+  const avgScore = useMemo(() => entries.length ? entries.reduce((sum, e) => sum + Number(e.score), 0) / entries.length : 0, [entries]);
+  const scoreLabel = scoringMethod === "net_profit" ? "Net P/L" : "Return";
+  const formatScore = (value: number) => scoringMethod === "net_profit" ? formatUSD(value) : formatPct(value);
 
   async function revealAssets(accountId: string) {
     if (revealed[accountId]) return;
@@ -215,11 +220,11 @@ export default function LeaderboardPage() {
             Reactive leaderboard
           </div>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Club rankings</h1>
-          <p className="mt-2 text-sm text-gray-400">Sorted by live growth on the capital each trader currently has invested. Refreshes every 30 seconds.</p>
+          <p className="mt-2 text-sm text-gray-400">Sorted by this competition&apos;s live {scoringMethod === "net_profit" ? "net paper profit" : "percentage return"}. Refreshes every 30 seconds.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
           <Metric label="Traders" value={String(entries.length)} />
-          <Metric label="Avg return" value={formatPct(avgReturn)} tone={avgReturn >= 0 ? "text-accent-green" : "text-accent-red"} caption={lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : undefined} />
+          <Metric label={`Avg ${scoreLabel}`} value={formatScore(avgScore)} tone={avgScore >= 0 ? "text-accent-green" : "text-accent-red"} caption={lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : undefined} />
         </div>
       </header>
 
@@ -228,7 +233,7 @@ export default function LeaderboardPage() {
       {podium.length > 0 && (
         <section className="grid gap-4 md:grid-cols-3">
           {podium.map((entry, index) => (
-            <PodiumCard key={entry.account_id} entry={entry} rank={index + 1} onOpenRank={openRank} />
+            <PodiumCard key={entry.account_id} entry={entry} rank={index + 1} onOpenRank={openRank} scoreLabel={scoreLabel} scoreText={formatScore(Number(entry.score))} />
           ))}
         </section>
       )}
@@ -249,7 +254,7 @@ export default function LeaderboardPage() {
                   <th className="w-20 px-4 py-3 text-left font-semibold">Rank</th>
                   <th className="px-4 py-3 text-left font-semibold">Trader</th>
                   <th className="px-4 py-3 text-right font-semibold">Portfolio</th>
-                  <th className="px-4 py-3 text-right font-semibold">Return</th>
+                  <th className="px-4 py-3 text-right font-semibold">{scoreLabel}</th>
                   <th className="px-4 py-3 text-right font-semibold">P/L</th>
                   <th className="px-4 py-3 text-right font-semibold">Progress</th>
                   <th className="px-4 py-3 text-right font-semibold">Assets</th>
@@ -272,7 +277,7 @@ export default function LeaderboardPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4 text-right font-semibold tabular-nums">{formatUSD(Number(entry.equity))}</td>
-                        <td className={cn("px-4 py-4 text-right font-black tabular-nums", up ? "text-accent-green" : "text-accent-red")}>{formatPct(Number(entry.return_pct))}</td>
+                        <td className={cn("px-4 py-4 text-right font-black tabular-nums", Number(entry.score) >= 0 ? "text-accent-green" : "text-accent-red")}>{formatScore(Number(entry.score))}</td>
                         <td className={cn("px-4 py-4 text-right font-semibold tabular-nums", up ? "text-accent-green" : "text-accent-red")}>{formatUSD(pl)}</td>
                         <td className="px-4 py-4 text-right">
                           <div className="ml-auto h-2 w-32 rounded-full bg-bg-elevated">
@@ -385,7 +390,7 @@ function YourRankHero({ detail, loading }: { detail: RankDetail | null; loading:
   );
 }
 
-function PodiumCard({ entry, rank, onOpenRank }: { entry: Entry; rank: number; onOpenRank: (id: string) => void }) {
+function PodiumCard({ entry, rank, onOpenRank, scoreLabel, scoreText }: { entry: Entry; rank: number; onOpenRank: (id: string) => void; scoreLabel: string; scoreText: string }) {
   const pl = Number(entry.gain_amount);
   const up = Number(entry.return_pct) >= 0;
   const Icon = rank === 1 ? Trophy : rank === 2 ? Medal : Award;
@@ -402,13 +407,13 @@ function PodiumCard({ entry, rank, onOpenRank }: { entry: Entry; rank: number; o
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className={cn("text-right font-black tabular-nums", up ? "text-accent-green" : "text-accent-red")}>{formatPct(Number(entry.return_pct))}</div>
+          <div className={cn("text-right font-black tabular-nums", Number(entry.score) >= 0 ? "text-accent-green" : "text-accent-red")}>{scoreText}</div>
           <RankIcon accountId={entry.account_id} onOpen={onOpenRank} />
         </div>
       </div>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <Metric label="Equity" value={formatUSD(Number(entry.equity))} />
-        <Metric label="Open P/L" value={formatUSD(pl)} tone={up ? "text-accent-green" : "text-accent-red"} />
+        <Metric label={scoreLabel} value={scoreText} tone={Number(entry.score) >= 0 ? "text-accent-green" : "text-accent-red"} />
       </div>
     </div>
   );
