@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
   }
 
   const account = context.account;
+  if (context.competition && context.competition.status !== "active") {
+    return NextResponse.json({ error: "Prediction trading is unavailable while this competition is not in progress." }, { status: 403 });
+  }
 
   const r = await buyPredictionShares({
     accountId: account.id,

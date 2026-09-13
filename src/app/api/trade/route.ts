@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
     }
 
     const account = context.account;
+    if (context.competition && context.competition.status !== "active") {
+      return NextResponse.json({ error: "Trading is unavailable while this competition is not in progress." }, { status: 403 });
+    }
+    if (context.competition && !context.competition.allow_crypto && parsed.data.symbol.toUpperCase().endsWith("-USD")) {
+      return NextResponse.json({ error: "Crypto trading is disabled for this competition." }, { status: 403 });
+    }
 
     const order = await placeOrder({
       account,

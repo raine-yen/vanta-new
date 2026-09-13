@@ -15,6 +15,11 @@ export type SessionAccount = {
   created_at: string;
 };
 
+export type CompetitionAccess = {
+  status: "draft" | "open" | "active" | "locked" | "settled" | "ended";
+  allow_crypto: boolean;
+};
+
 export function isMissingTableError(error: unknown) {
   const message =
     typeof error === "object" && error && "message" in error
@@ -57,7 +62,15 @@ export async function getCurrentAccount(req: NextRequest) {
   if (account.status !== "active") {
     return { response: NextResponse.json({ error: "account disabled" }, { status: 403 }) };
   }
-  return { user, account: account as SessionAccount, db };
+
+  const { data: competition, error: competitionError } = await db
+    .from("competitions")
+    .select("status, allow_crypto")
+    .eq("id", account.competition_id)
+    .maybeSingle();
+  if (competitionError) return { response: NextResponse.json({ error: competitionError.message }, { status: 500 }) };
+
+  return { user, account: account as SessionAccount, competition: competition as CompetitionAccess | null, db };
 }
 
 export function cleanSymbol(symbol: unknown) {

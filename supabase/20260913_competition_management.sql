@@ -30,6 +30,7 @@ create index if not exists idx_competitions_discovery
 -- Competitions are readable by signed-in members. Writes only travel through
 -- server-side admin routes using the service role.
 alter table public.competitions enable row level security;
+drop policy if exists "anyone sees competitions" on public.competitions;
 drop policy if exists "authenticated users see competitions" on public.competitions;
 create policy "authenticated users see competitions"
   on public.competitions for select to authenticated using (true);
