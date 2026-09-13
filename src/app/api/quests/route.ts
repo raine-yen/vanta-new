@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdaptiveQuests, getDailyQuestCycle, type DailyQuestStats } from "@/lib/adaptive-quests";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getSessionUser } from "@/lib/session-user";
+import { getCurrentAccount } from "@/lib/app-data";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const REWARD_POINTS = 200; // recognition points only — never account cash
 
-async function accountForUser(db: ReturnType<typeof supabaseAdmin>, userId: string) {
-  const { data } = await db.from("accounts").select("id").eq("user_id", userId).order("created_at", { ascending: true }).limit(1).maybeSingle();
-  return data as { id: string } | null;
-}
-
-async function questState(accountId: string) {
-  const db = supabaseAdmin();
+async function questState(db: SupabaseClient, accountId: string) {
   const cycle = getDailyQuestCycle();
-  const start = `${cycle.label}T00:00:00.000Z`;
+  const dayStart = new Date(`${cycle.label}T00:00:00.000Z`);
+  const start = dayStart.toISOString();
+  const end = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
   const [todayOrdersResult, totalOrdersResult, predictionResult, claimsResult] = await Promise.all([
-    db.from("orders").select("symbol, side, type, status").eq("account_id", accountId).gte("created_at", start),
+    db.from("orders").select("symbol, side, type, status").eq("account_id", accountId).gte("created_at", start).lt("created_at", end),
     db.from("orders").select("id", { count: "exact", head: true }).eq("account_id", accountId),
-    db.from("prediction_fills").select("id").eq("account_id", accountId).in("side", ["buy", "sell"]).gte("created_at", start),
+    db.from("prediction_fills").select("id").eq("account_id", accountId).in("side", ["buy", "sell"]).gte("created_at", start).lt("created_at", end),
     db.from("quest_points").select("quest_id, cycle_id").eq("account_id", accountId).eq("cycle_id", cycle.id),
   ]);
   const submittedOrders = (todayOrdersResult.data ?? []) as Array<{ symbol: string; side: string; type: string; status: string }>;
@@ -36,30 +32,25 @@ async function questState(accountId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser(req);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const account = await accountForUser(supabaseAdmin(), user.id);
-  if (!account) return NextResponse.json({ claims: [], quests: [], cycle: getDailyQuestCycle() });
-  return NextResponse.json(await questState(account.id));
+  const context = await getCurrentAccount(req);
+  if ("response" in context) return context.response;
+  return NextResponse.json(await questState(context.db, context.account.id));
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getSessionUser(req);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const context = await getCurrentAccount(req);
+  if ("response" in context) return context.response;
   const body = await req.json().catch(() => null);
   const questId = typeof body?.quest_id === "string" ? body.quest_id : "";
   const cycleId = typeof body?.cycle_id === "string" ? body.cycle_id : "";
   if (!questId || !cycleId) return NextResponse.json({ error: "quest_id and cycle_id required" }, { status: 400 });
 
-  const db = supabaseAdmin();
-  const account = await accountForUser(db, user.id);
-  if (!account) return NextResponse.json({ error: "no account" }, { status: 400 });
-  const state = await questState(account.id);
+  const state = await questState(context.db, context.account.id);
   const quest = state.quests.find((item) => item.id === questId);
   if (cycleId !== state.cycle.id || !quest) return NextResponse.json({ error: "That quest is no longer active." }, { status: 400 });
   if (quest.progress < quest.goal) return NextResponse.json({ error: "Complete this daily quest before claiming it." }, { status: 409 });
 
-  const { error: claimError } = await db.from("quest_points").insert({ account_id: account.id, quest_id: questId, cycle_id: cycleId, points: REWARD_POINTS });
+  const { error: claimError } = await context.db.from("quest_points").insert({ account_id: context.account.id, quest_id: questId, cycle_id: cycleId, points: REWARD_POINTS });
   const message = claimError?.message?.toLowerCase() ?? "";
   if (claimError?.code === "23505" || message.includes("duplicate")) return NextResponse.json({ error: "reward already claimed" }, { status: 409 });
   if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 });
