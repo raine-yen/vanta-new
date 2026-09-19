@@ -15,9 +15,11 @@ test("Predictions is a first-class in-app workspace with a real paper trade and 
   assert.match(nav, /href: "\/predictions"/, "Predictions must be a primary destination");
   assert.match(page, /PredictionWorkspace/, "The route must render the dedicated workspace");
 
-  // The UI exposes the outcome contract, not a stock-like generic ticket.
-  assert.match(workspace, /Buy Yes/);
-  assert.match(workspace, /Buy No/);
+  // The UI exposes named outcome choices, not a stock-like generic ticket.
+  assert.match(workspace, /predictionOutcomeLabels/);
+  assert.match(workspace, /const yesLabel = outcomeLabel\(market, "yes"\), noLabel = outcomeLabel\(market, "no"\)/);
+  assert.match(workspace, /Buy \$\{yesLabel\}/);
+  assert.match(workspace, /Buy \$\{noLabel\}/);
   assert.match(workspace, /Payout if correct/);
   assert.match(workspace, /Potential profit/);
   assert.match(workspace, /\/api\/prediction-markets/);

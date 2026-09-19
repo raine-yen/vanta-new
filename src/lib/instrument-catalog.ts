@@ -392,12 +392,17 @@ export async function searchInstruments(rawQuery: string, options: SearchOptions
     .filter(({ score }) => score > 0);
   const providerSymbols = new Set(providerScored.map(({ instrument }) => instrument.symbol));
   const preferStocks = !isExplicitCryptoQuery(query);
-  const ranked = [...localMatches, ...providerScored].sort((a, b) =>
-    (preferStocks ? assetSearchPriority(b.instrument.assetClass) - assetSearchPriority(a.instrument.assetClass) : 0) ||
-    Math.floor(b.score) - Math.floor(a.score) ||
-    (!preferStocks ? assetSearchPriority(b.instrument.assetClass) - assetSearchPriority(a.instrument.assetClass) : 0) ||
-    b.score - a.score,
-  );
+  const ranked = [...localMatches, ...providerScored].sort((a, b) => {
+    const stockVsCrypto = preferStocks && (
+      ((a.instrument.assetClass === "stock" || a.instrument.assetClass === "etf") && b.instrument.assetClass === "crypto") ||
+      ((b.instrument.assetClass === "stock" || b.instrument.assetClass === "etf") && a.instrument.assetClass === "crypto")
+    );
+    if (stockVsCrypto) return assetSearchPriority(b.instrument.assetClass) - assetSearchPriority(a.instrument.assetClass);
+    return Math.floor(b.score) - Math.floor(a.score) ||
+      (preferStocks ? assetSearchPriority(b.instrument.assetClass) - assetSearchPriority(a.instrument.assetClass) : 0) ||
+      (!preferStocks ? assetSearchPriority(b.instrument.assetClass) - assetSearchPriority(a.instrument.assetClass) : 0) ||
+      b.score - a.score;
+  });
 
   const merged: InstrumentSearchResult[] = ranked.map(({ instrument, score }) => ({
     ...instrument,

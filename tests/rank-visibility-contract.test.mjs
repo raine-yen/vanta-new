@@ -21,8 +21,8 @@ test("GET /api/leaderboard response never includes tier/division/movement keys",
   // The response object literal actually sent to the client must strip these.
   assert.match(route, /const entries = standings\.map\(/);
   assert.match(route, /_tier, _tier_name, _division, _rank_points, _movement, _movement_amount/);
-  assert.match(route, /NextResponse\.json\(\{ entries \}\)/);
-  // Internal-only fields stay prefixed so a future edit can't leak them by accident.
+  assert.match(route, /NextResponse\.json\(\{ entries, scoring_method: scoringMethod \}\)/);
+  // scoring_method is public configuration; internal rank fields stay prefixed so a future edit can't leak them by accident.
   assert.doesNotMatch(route, /NextResponse\.json\(\{\s*entries:\s*standings\s*\}\)/);
 });
 

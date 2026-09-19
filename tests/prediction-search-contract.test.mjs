@@ -20,13 +20,18 @@ test("scorePredictionMarket ranks question-prefix above substring above fuzzy", 
   assert.equal(scorePredictionMarket(row, "zzz nonsense"), 0);
 });
 
-test("'fed' surfaces a Fed prediction market via injected predictionDb", async () => {
+test("'fed' ranks an injected Fed prediction above lower-scoring stock provider matches", async () => {
   const rows = [
     { id: "0xfed", question: "Will the Fed cut rates in March?", category: "Economics", yes_price: 0.62, no_price: 0.38, image: null, url: "https://polymarket.com/x", status: "active" },
   ];
-  const results = await searchInstruments("fed", { limit: 5, predictionDb: fakeDb(rows) });
+  const providerResults = [
+    { symbol: "FDE1", displayName: "Faded One", name: "faded one", aliases: ["faded"], assetClass: "stock", exchange: "NYSE", market: "us-equities", tradable: true, displaySymbol: "FDE1", displayMarket: "NYSE" },
+    { symbol: "FDE2", displayName: "Faded Two", name: "faded two", aliases: ["faded"], assetClass: "stock", exchange: "NYSE", market: "us-equities", tradable: true, displaySymbol: "FDE2", displayMarket: "NYSE" },
+  ];
+  const results = await searchInstruments("fed", { limit: 5, predictionDb: fakeDb(rows), providerResults });
   const hit = results.find((r) => r.assetClass === "prediction");
   assert.ok(hit, `expected a prediction hit, got ${JSON.stringify(results.map((r) => [r.symbol, r.assetClass]))}`);
+  assert.equal(results[0]?.assetClass, "prediction");
   assert.equal(hit.marketId, "0xfed");
   assert.equal(hit.url, "https://polymarket.com/x");
   assert.equal(hit.tradable, true);

@@ -87,7 +87,7 @@ function baseState() {
   return {
     accounts: [{ id: "acct-1", cash: 1000 }],
     prediction_markets: [{
-      id: "m1", question: "Fed cuts in September?", slug: "fed-cut",
+      id: "m1", question: "Fed cuts in September?", event_slug: "fed-cut",
       end_date: "2026-09-30T00:00:00Z", volume24h: 0, liquidity: 0,
       status: "active", resolved_outcome: null, settled_at: null,
       yes_token_id: "111", no_token_id: "222", yes_price: 0.5, no_price: 0.5,
