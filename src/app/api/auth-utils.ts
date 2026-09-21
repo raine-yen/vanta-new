@@ -30,7 +30,8 @@ export async function resolveAccount(req: NextRequest): Promise<ResolvedAccount 
   const context = await getCurrentAccount(req);
   // getCurrentAccount returns { response: NextResponse } on error, or { user, account, db, competition? } on success
   if ("account" in context && "db" in context) return context as ResolvedAccount;
-  return (context as any).response;
+  if ("response" in context) return context.response;
+  return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 }
 
 export { isMissingTableError };
