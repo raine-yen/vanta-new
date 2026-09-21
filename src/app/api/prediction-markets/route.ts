@@ -1,3 +1,5 @@
+// Prediction markets list — no auth required (public catalog).
+// Also accessible via API key for authenticated agents.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -8,6 +10,7 @@ import {
   type PredictionMarketRow,
 } from "@/lib/prediction-sync";
 import { predictionOutcomeLabels } from "@/lib/prediction-presentation";
+import { authenticateApiKey } from "@/lib/auth";
 
 export interface PredictionMarket {
   id: string; // condition id (catalog PK; matches /api/predictions/* routes)

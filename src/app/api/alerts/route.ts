@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cleanSymbol, getCurrentAccount, isMissingTableError } from "@/lib/app-data";
+import { cleanSymbol } from "@/lib/app-data";
+import { resolveAccount, isMissingTableError } from "../auth-utils";
 
 const alertSchema = z.object({
   symbol: z.string().min(1),
@@ -10,8 +11,8 @@ const alertSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const { data, error } = await ctx.db
     .from("price_alerts")
@@ -28,8 +29,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const body = await req.json().catch(() => null);
   const parsed = alertSchema.safeParse(body);
@@ -60,8 +61,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const body = await req.json().catch(() => ({}));
   const id = String(body.id ?? "");

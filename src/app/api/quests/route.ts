@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdaptiveQuests, getDailyQuestCycle, type DailyQuestStats } from "@/lib/adaptive-quests";
-import { getCurrentAccount } from "@/lib/app-data";
+import { resolveAccount } from "../auth-utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const REWARD_POINTS = 200; // recognition points only — never account cash
@@ -31,14 +31,14 @@ async function questState(db: SupabaseClient, accountId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const context = await getCurrentAccount(req);
-  if ("response" in context) return context.response;
+  const context = await resolveAccount(req);
+  if (!("account" in context)) return context as NextResponse;
   return NextResponse.json(await questState(context.db, context.account.id));
 }
 
 export async function POST(req: NextRequest) {
-  const context = await getCurrentAccount(req);
-  if ("response" in context) return context.response;
+  const context = await resolveAccount(req);
+  if (!("account" in context)) return context as NextResponse;
   const body = await req.json().catch(() => null);
   const questId = typeof body?.quest_id === "string" ? body.quest_id : "";
   const cycleId = typeof body?.cycle_id === "string" ? body.cycle_id : "";

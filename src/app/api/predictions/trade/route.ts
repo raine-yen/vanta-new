@@ -1,8 +1,8 @@
-// Browser-facing prediction buy endpoint — session auth, shared paper cash.
+// Prediction trade endpoint — supports session or API key auth for agents
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { buyPredictionShares } from "@/lib/prediction-engine";
-import { getCurrentAccount } from "@/lib/app-data";
+import { resolveAccount } from "../../auth-utils";
 
 const buySchema = z.object({
   market_id: z.string().min(1),
@@ -12,8 +12,8 @@ const buySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const context = await getCurrentAccount(req);
-  if ("response" in context) return context.response;
+  const context = await resolveAccount(req);
+  if (!("account" in context)) return context as NextResponse;
 
   const body = await req.json().catch(() => null);
   const parsed = buySchema.safeParse(body);

@@ -1,9 +1,9 @@
-// Browser-facing trade endpoint — uses session, not API key
+// Trade endpoint — supports session or API key auth for agents
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { placeOrder } from "@/lib/engine";
 import { toAlpacaOrder } from "@/lib/alpaca-format";
-import { getCurrentAccount } from "@/lib/app-data";
+import { resolveAccount } from "../auth-utils";
 
 const tradeSchema = z.object({
   symbol: z.string().min(1),
@@ -17,8 +17,8 @@ const tradeSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const context = await getCurrentAccount(req);
-    if ("response" in context) return context.response;
+    const context = await resolveAccount(req);
+    if (!("account" in context)) return context as NextResponse;
 
     const body = await req.json().catch(() => null);
     const parsed = tradeSchema.safeParse(body);

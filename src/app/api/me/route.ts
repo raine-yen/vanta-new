@@ -2,15 +2,120 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseForRequest } from "@/lib/supabase/request";
 import { fetchYahooPrices } from "@/lib/prices";
 import { getSessionUser } from "@/lib/session-user";
+import { authenticateApiKey } from "@/lib/auth";
 import { getSelectedCompetitionAccount, isMissingTableError } from "@/lib/app-data";
 import { isAdminEmail } from "@/lib/admin";
 import { calculateInvestedPerformance } from "@/lib/performance";
 import { ensurePaperAccount } from "@/lib/ensure-paper-account";
 import { portfolioReturnPct } from "@/lib/ranks";
 import { liveMidpoint, type PredictionMarketRow } from "@/lib/prediction-sync";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // Authenticated dashboard endpoint — returns the current user's account, positions, recent orders.
 export async function GET(req: NextRequest) {
+  // Try API key auth first (for agents)
+  const apiAuth = await authenticateApiKey(req);
+  if (apiAuth.ok) {
+    const db = supabaseAdmin();
+    const account = apiAuth.auth.account;
+
+    const [
+      { data: positions },
+      { data: orders },
+      { data: fills },
+      { data: snapshots },
+      watchlistResult,
+      alertsResult,
+      profileResult,
+      messagesResult,
+      { data: predictionPositions },
+      { data: predictionFills },
+      { data: businesses },
+    ] = await Promise.all([
+      db.from("positions").select("*").eq("account_id", account.id),
+      db.from("orders").select("*").eq("account_id", account.id).order("created_at", { ascending: false }).limit(25),
+      db.from("fills").select("*").eq("account_id", account.id).order("created_at", { ascending: false }).limit(25),
+      db.from("equity_snapshots").select("equity, created_at").eq("account_id", account.id).order("created_at", { ascending: true }).limit(500),
+      db.from("watchlists").select("id, symbol, note, created_at").eq("account_id", account.id).order("created_at", { ascending: false }).limit(12),
+      db.from("price_alerts").select("id, symbol, direction, target_price, move_pct, status, created_at").eq("account_id", account.id).neq("status", "deleted").order("created_at", { ascending: false }).limit(12),
+      db.from("trader_profiles").select("*").eq("account_id", account.id).maybeSingle(),
+      db.from("direct_messages").select("id").eq("recipient_account_id", account.id).is("read_at", null).eq("hidden_by_admin", false),
+      db.from("prediction_positions").select("*").eq("account_id", account.id).gt("shares", 0),
+      db.from("prediction_fills").select("*").eq("account_id", account.id).order("created_at", { ascending: false }).limit(25),
+      db.from("businesses").select("*").eq("account_id", account.id).order("created_at", { ascending: false }),
+    ]);
+
+    const symbols = (positions ?? []).map((p: { symbol: string }) => p.symbol);
+    const priceMap = await fetchYahooPrices(symbols);
+
+    const positionsWithMarket = (positions ?? []).map((p: { symbol: string; qty: number; avg_entry_price: number; id: string }) => {
+      const cp = priceMap.get(p.symbol)?.price ?? Number(p.avg_entry_price);
+      const marketValue = Number(p.qty) * cp;
+      const costBasis = Number(p.qty) * Number(p.avg_entry_price);
+      const unrealizedPL = marketValue - costBasis;
+      return {
+        ...p,
+        current_price: cp,
+        market_value: marketValue,
+        cost_basis: costBasis,
+        unrealized_pl: unrealizedPL,
+        unrealized_plpc: costBasis === 0 ? 0 : (unrealizedPL / costBasis) * 100,
+      };
+    });
+
+    const positionsValue = positionsWithMarket.reduce((s, p) => s + p.market_value, 0);
+
+    const predMarketIds = Array.from(new Set((predictionPositions ?? []).map((p: { market_id: string }) => p.market_id)));
+    const predMarketRows = predMarketIds.length
+      ? (await db.from("prediction_markets").select("*").in("id", predMarketIds)).data ?? []
+      : [];
+    const predMarketById = new Map((predMarketRows as PredictionMarketRow[]).map((m) => [m.id, m]));
+    const predictionPositionsWithMarket = await Promise.all(
+      (predictionPositions ?? []).map(async (p: { id: string; market_id: string; outcome: string; shares: number; avg_cost: number }) => {
+        const market = predMarketById.get(p.market_id);
+        const tokenId = (p.outcome === "yes" ? market?.yes_token_id : market?.no_token_id) ?? null;
+        const fallback = (p.outcome === "yes" ? market?.yes_price : market?.no_price) ?? null;
+        const price = (await liveMidpoint(tokenId, fetch, fallback)) ?? Number(p.avg_cost);
+        const shares = Number(p.shares);
+        const marketValue = shares * price;
+        const costBasis = shares * Number(p.avg_cost);
+        return {
+          ...p,
+          question: market?.question ?? null,
+          current_price: price,
+          market_value: marketValue,
+          cost_basis: costBasis,
+          unrealized_pl: marketValue - costBasis,
+        };
+      }),
+    );
+    const predictionPositionsValue = predictionPositionsWithMarket.reduce((s, p) => s + p.market_value, 0);
+
+    const equity = Number(account.cash) + positionsValue + predictionPositionsValue;
+    const performance = calculateInvestedPerformance(positionsWithMarket);
+
+    return NextResponse.json({
+      user: { id: apiAuth.auth.apiKey.user_id, email: null },
+      is_admin: false,
+      account: { ...account, equity, positions_value: positionsValue, prediction_positions_value: predictionPositionsValue },
+      performance,
+      positions: positionsWithMarket,
+      orders: orders ?? [],
+      fills: fills ?? [],
+      snapshots: snapshots ?? [],
+      watchlist: watchlistResult.error && isMissingTableError(watchlistResult.error) ? [] : watchlistResult.data ?? [],
+      alerts: alertsResult.error && isMissingTableError(alertsResult.error) ? [] : alertsResult.data ?? [],
+      profile: profileResult.error && isMissingTableError(profileResult.error) ? null : profileResult.data ?? null,
+      unread_messages: messagesResult.error && isMissingTableError(messagesResult.error) ? 0 : messagesResult.data?.length ?? 0,
+      prediction_positions: predictionPositionsWithMarket,
+      prediction_positions_value: predictionPositionsValue,
+      prediction_fills: predictionFills ?? [],
+      businesses: businesses ?? [],
+      competition: { rank: null, participants: 0, return_pct: 0 },
+    });
+  }
+
+  // Fallback to session auth
   const user = await getSessionUser(req);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

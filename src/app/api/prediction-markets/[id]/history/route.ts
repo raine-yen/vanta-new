@@ -1,3 +1,4 @@
+// Probability history chart — no auth required (public data).
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { fetchProbabilityHistory } from "@/lib/prediction-sync";

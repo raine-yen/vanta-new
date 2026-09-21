@@ -1,3 +1,4 @@
+// Prediction market detail — no auth required (public catalog).
 import { NextRequest, NextResponse } from "next/server";
 import { predictionOutcomeLabels } from "@/lib/prediction-presentation";
 import { fetchUpstreamPredictionMarketState, type PredictionMarketRow } from "@/lib/prediction-sync";

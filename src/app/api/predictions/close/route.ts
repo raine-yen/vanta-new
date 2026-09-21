@@ -1,10 +1,8 @@
-// Close-early sell endpoint — Polymarket/Robinhood behavior: sell any amount
-// (or all shares via close_all) at the live market price; proceeds return to
-// the shared paper cash.
+// Close-early sell endpoint — supports session or API key auth for agents
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sellPredictionShares } from "@/lib/prediction-engine";
-import { getCurrentAccount } from "@/lib/app-data";
+import { resolveAccount } from "../../auth-utils";
 
 const closeSchema = z
   .object({
@@ -19,8 +17,8 @@ const closeSchema = z
   });
 
 export async function POST(req: NextRequest) {
-  const context = await getCurrentAccount(req);
-  if ("response" in context) return context.response;
+  const context = await resolveAccount(req);
+  if (!("account" in context)) return context as NextResponse;
 
   const body = await req.json().catch(() => null);
   const parsed = closeSchema.safeParse(body);

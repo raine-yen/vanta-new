@@ -1,10 +1,13 @@
+// Watchlists — supports session or API key auth for agents
 import { NextRequest, NextResponse } from "next/server";
-import { cleanSymbol, getCurrentAccount, isMissingTableError } from "@/lib/app-data";
+import { z } from "zod";
+import { cleanSymbol } from "@/lib/app-data";
 import { fetchYahooPrices } from "@/lib/prices";
+import { resolveAccount, isMissingTableError } from "../auth-utils";
 
 export async function GET(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const { data, error } = await ctx.db
     .from("watchlists")
@@ -30,8 +33,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const body = await req.json().catch(() => ({}));
   const symbol = cleanSymbol(body.symbol);
@@ -48,8 +51,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const symbol = cleanSymbol(new URL(req.url).searchParams.get("symbol"));
   if (!symbol) return NextResponse.json({ error: "symbol required" }, { status: 400 });

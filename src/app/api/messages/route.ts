@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentAccount, isMissingTableError } from "@/lib/app-data";
+import { resolveAccount, isMissingTableError } from "../auth-utils";
 
 export async function GET(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const other = new URL(req.url).searchParams.get("account_id");
   let query = ctx.db
@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const body = await req.json().catch(() => ({}));
   const other = typeof body.account_id === "string" ? body.account_id : null;
@@ -64,8 +64,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getCurrentAccount(req);
-  if ("response" in ctx) return ctx.response;
+  const ctx = await resolveAccount(req);
+  if (!("account" in ctx)) return ctx as NextResponse;
 
   const body = await req.json().catch(() => ({}));
   const recipient = String(body.recipient_account_id ?? "");

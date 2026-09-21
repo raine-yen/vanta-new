@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { settlePredictionMarkets } from "@/lib/prediction-settle";
-import { getCurrentAccount } from "@/lib/app-data";
+import { resolveAccount } from "../../auth-utils";
 
-// Settles only the signed-in trader's resolved prediction positions. This
-// short path lets a user receive a paper payout immediately rather than
-// waiting for the once-daily cron settlement pass.
+// Settles only the authenticated trader's resolved prediction positions. Supports session or API key auth.
 export async function POST(req: NextRequest) {
-  const context = await getCurrentAccount(req);
-  if ("response" in context) return context.response;
+  const context = await resolveAccount(req);
+  if (!("account" in context)) return context as NextResponse;
   const { db, account } = context;
 
   try {
