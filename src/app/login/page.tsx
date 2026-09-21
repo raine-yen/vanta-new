@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
@@ -11,6 +11,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code === "google_oauth_unavailable") setError("Google sign-in is not available yet. Please use email and password.");
+    if (code === "google_callback_failed") setError("Google sign-in could not be completed. Please try again.");
+    if (code === "account_setup_failed") setError("Your Google account signed in, but your paper account could not be created.");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +78,15 @@ export default function LoginPage() {
               {loading ? "Signing in…" : <>Sign in to Vanta <ArrowRight className="h-4 w-4" /></>}
             </button>
           </form>
+
+          <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[.14em] text-gray-600">
+            <span className="h-px flex-1 bg-bg-border" />
+            <span>or</span>
+            <span className="h-px flex-1 bg-bg-border" />
+          </div>
+          <a href="/api/auth/google?next=%2Fdashboard" className="flex h-12 w-full items-center justify-center gap-2 border border-bg-border bg-bg-soft text-sm font-semibold text-gray-100 transition hover:border-gray-500">
+            Continue with Google
+          </a>
 
           <p className="mt-7 text-sm text-gray-400">New to Vanta? <Link href="/signup" className="font-semibold text-accent-green hover:text-green-300 focus-visible:outline-none focus-visible:underline">Create a paper account</Link></p>
         </div>

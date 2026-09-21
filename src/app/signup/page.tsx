@@ -74,6 +74,14 @@ export default function SignupPage() {
               {loading ? "Creating..." : "Create account"}
             </button>
           </form>
+          <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[.14em] text-gray-600">
+            <span className="h-px flex-1 bg-bg-border" />
+            <span>or</span>
+            <span className="h-px flex-1 bg-bg-border" />
+          </div>
+          <a href="/api/auth/google?next=%2Fdashboard" className="flex h-12 w-full items-center justify-center border border-bg-border bg-bg-soft text-sm font-semibold text-gray-100 transition hover:border-gray-500">
+            Continue with Google
+          </a>
           <p className="text-center text-sm text-gray-400 mt-6">
             Already have an account? <Link href="/login" className="text-accent hover:underline">Log in</Link>
           </p>
