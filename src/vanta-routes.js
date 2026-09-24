@@ -648,6 +648,20 @@ router.get('/api/cron/health', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Cron endpoints (require CRON_SECRET Bearer auth) ----
+router.post('/api/cron/tick', requireCronAuth, async (req, res, next) => {
+  try { await tickCron(req, res); } catch (e) { next(e); }
+});
+router.post('/api/cron/snapshot', requireCronAuth, async (req, res, next) => {
+  try { await snapshotCron(req, res); } catch (e) { next(e); }
+});
+router.post('/api/cron/predictions', requireCronAuth, async (req, res, next) => {
+  try { await predictionsCron(req, res); } catch (e) { next(e); }
+});
+router.post('/api/cron/predictions-settle', requireCronAuth, async (req, res, next) => {
+  try { await settleCron(req, res); } catch (e) { next(e); }
+});
+
 // ---- Helper functions ----
 async function getAccountForUser(userId) {
   const pool = getPool();
