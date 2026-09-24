@@ -6,6 +6,8 @@ const express = require('express');
 const crypto = require('crypto');
 const mysql = require('mysql2/promise');
 const { getPool, generateId, healthCheck } = require('./lib/mysql-client');
+const mysqlDuck = require('./lib/mysql-duck');
+const db = mysqlDuck.wrapPool(getPool());
 const {
   verifySession, verifyApiKey, promoteUser,
   hashPassword,
@@ -86,7 +88,7 @@ router.get('/health', async (req, res) => {
 });
 
 // ---- Auth ----
-router.post('/api/auth/signup', async (req, res) => {
+router.post('auth/signup', async (req, res) => {
   try {
     const { email, password, displayName } = req.body || {};
     const result = await require('lib/auth-mysql').signUp(email, password, displayName);
@@ -96,7 +98,7 @@ router.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-router.post('/api/auth/login', async (req, res) => {
+router.post('auth/login', async (req, res) => {
   try {
     const { email, password } = req.body || {};
     const result = await require('lib/auth-mysql').signIn(email, password);
@@ -106,20 +108,20 @@ router.post('/api/auth/login', async (req, res) => {
   }
 });
 
-router.post('/api/auth/logout', requireAuth, async (req, res) => {
+router.post('auth/logout', requireAuth, async (req, res) => {
   const auth = req.get('Authorization') || '';
   await require('lib/auth-mysql').signOut(auth.slice(7));
   res.json({ ok: true });
 });
 
-router.post('/api/auth/refresh', async (req, res) => {
+router.post('auth/refresh', async (req, res) => {
   const auth = req.get('Authorization') || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const result = await require('lib/auth-mysql').refreshSession(auth.slice(7));
   res.json({ ok: true, token: result.token });
 });
 
-router.post('/api/auth/google', async (req, res) => {
+router.post('auth/google', async (req, res) => {
   try {
     const { googleId, email, displayName } = req.body || {};
     const result = await require('lib/auth-mysql').googleOAuthCallback(googleId, email, displayName);
@@ -130,7 +132,7 @@ router.post('/api/auth/google', async (req, res) => {
 });
 
 // ---- Me ----
-router.get('/api/me', requireAuth, async (req, res) => {
+router.get('me', requireAuth, async (req, res) => {
   const pool = getPool();
   const [accounts] = await pool.execute(
     'SELECT a.*, c.name as competition_name FROM accounts a JOIN competitions c ON a.competition_id = c.id WHERE a.user_id = ?',
@@ -146,13 +148,13 @@ router.get('/api/me', requireAuth, async (req, res) => {
 });
 
 // ---- Competitions ----
-router.get('/api/competitions', async (req, res) => {
+router.get('competitions', async (req, res) => {
   const pool = getPool();
   const [rows] = await pool.execute('SELECT * FROM competitions ORDER BY is_default DESC, created_at DESC');
   res.json(rows || []);
 });
 
-router.get('/api/competitions/:id', async (req, res) => {
+router.get('competitions/:id', async (req, res) => {
   const pool = getPool();
   const [rows] = await pool.execute('SELECT * FROM competitions WHERE id = ?', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Not found' });
@@ -160,7 +162,7 @@ router.get('/api/competitions/:id', async (req, res) => {
 });
 
 // ---- Leaderboard ----
-router.get('/api/leaderboard', async (req, res) => {
+router.get('leaderboard', async (req, res) => {
   const pool = getPool();
   const [rows] = await pool.execute(
     `SELECT a.id, a.user_id, a.display_name, a.cash, a.equity, a.status,
@@ -174,7 +176,7 @@ router.get('/api/leaderboard', async (req, res) => {
   res.json(rows || []);
 });
 
-router.get('/api/rank', requireAuth, async (req, res) => {
+router.get('rank', requireAuth, async (req, res) => {
   const pool = getPool();
   const [ranks] = await pool.execute(
     'SELECT * FROM ranks WHERE account_id = ? ORDER BY rank_points DESC',
@@ -184,7 +186,7 @@ router.get('/api/rank', requireAuth, async (req, res) => {
 });
 
 // ---- Quote ----
-router.get('/api/quote', async (req, res) => {
+router.get('quote', async (req, res) => {
   try {
     const symbol = (req.query.symbol || '').toUpperCase();
     if (!symbol) return res.status(400).json({ error: 'symbol required' });
@@ -196,7 +198,7 @@ router.get('/api/quote', async (req, res) => {
   }
 });
 
-router.get('/api/quotes', async (req, res) => {
+router.get('quotes', async (req, res) => {
   try {
     const symbols = (req.query.symbols || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
     if (!symbols.length) return res.status(400).json({ error: 'symbols required' });
@@ -208,7 +210,7 @@ router.get('/api/quotes', async (req, res) => {
 });
 
 // ---- Live market ----
-router.get('/api/live', async (req, res) => {
+router.get('live', async (req, res) => {
   try {
     const symbols = (req.query.symbols || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
     const prices = await require('lib/prices').fetchYahooPrices(symbols);
@@ -219,7 +221,7 @@ router.get('/api/live', async (req, res) => {
 });
 
 // ---- Chart ----
-router.get('/api/chart', async (req, res) => {
+router.get('chart', async (req, res) => {
   try {
     const symbol = (req.query.symbol || '').toUpperCase();
     const range = req.query.range || '1mo';
@@ -232,7 +234,7 @@ router.get('/api/chart', async (req, res) => {
 });
 
 // ---- Trade (place order) ----
-router.post('/api/trade', requireAuth, async (req, res) => {
+router.post('trade', requireAuth, async (req, res) => {
   try {
     const body = req.body || {};
     const account = await getAccountForUser(req.user.userId);
@@ -256,7 +258,7 @@ router.post('/api/trade', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/api/trader/:accountId', async (req, res) => {
+router.get('trader/:accountId', async (req, res) => {
   const pool = getPool();
   const [accounts] = await pool.execute(
     'SELECT * FROM accounts WHERE id = ?', [req.params.accountId]
@@ -279,7 +281,7 @@ router.get('/api/trader/:accountId', async (req, res) => {
 });
 
 // ---- Account ----
-router.get('/api/account', requireAuth, async (req, res) => {
+router.get('account', requireAuth, async (req, res) => {
   const pool = getPool();
   const [accounts] = await pool.execute(
     'SELECT * FROM accounts WHERE user_id = ?', [req.user.userId]
@@ -288,7 +290,7 @@ router.get('/api/account', requireAuth, async (req, res) => {
 });
 
 // ---- Keys ----
-router.get('/api/keys', requireAuth, async (req, res) => {
+router.get('keys', requireAuth, async (req, res) => {
   const pool = getPool();
   const [keys] = await pool.execute(
     'SELECT id, key_id, label, last_used_at, revoked_at, created_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC',
@@ -297,7 +299,7 @@ router.get('/api/keys', requireAuth, async (req, res) => {
   res.json(keys || []);
 });
 
-router.post('/api/keys', requireAuth, async (req, res) => {
+router.post('keys', requireAuth, async (req, res) => {
   try {
     const pool = getPool();
     const body = req.body || {};
@@ -317,7 +319,7 @@ router.post('/api/keys', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/api/keys/:id', requireAuth, async (req, res) => {
+router.get('keys/:id', requireAuth, async (req, res) => {
   const pool = getPool();
   const [keys] = await pool.execute(
     'SELECT * FROM api_keys WHERE id = ? AND user_id = ?',
@@ -327,7 +329,7 @@ router.get('/api/keys/:id', requireAuth, async (req, res) => {
   res.json(keys[0]);
 });
 
-router.delete('/api/keys/:id', requireAuth, async (req, res) => {
+router.delete('keys/:id', requireAuth, async (req, res) => {
   const pool = getPool();
   await pool.execute(
     'UPDATE api_keys SET revoked_at = NOW(3) WHERE id = ? AND user_id = ?',
@@ -337,7 +339,7 @@ router.delete('/api/keys/:id', requireAuth, async (req, res) => {
 });
 
 // ---- Predictions ----
-router.get('/api/prediction-markets', async (req, res) => {
+router.get('prediction-markets', async (req, res) => {
   const pool = getPool();
   const [markets] = await pool.execute(
     'SELECT * FROM prediction_markets WHERE status = ? ORDER BY volume_24h DESC LIMIT 50',
@@ -346,7 +348,7 @@ router.get('/api/prediction-markets', async (req, res) => {
   res.json(markets || []);
 });
 
-router.get('/api/prediction-markets/:id', async (req, res) => {
+router.get('prediction-markets/:id', async (req, res) => {
   const pool = getPool();
   const [markets] = await pool.execute(
     'SELECT * FROM prediction_markets WHERE id = ?', [req.params.id]
@@ -355,7 +357,7 @@ router.get('/api/prediction-markets/:id', async (req, res) => {
   res.json(markets[0]);
 });
 
-router.get('/api/prediction-markets/:id/history', async (req, res) => {
+router.get('prediction-markets/:id/history', async (req, res) => {
   const pool = getPool();
   const [history] = await pool.execute(
     'SELECT * FROM prediction_fills WHERE market_id = ? ORDER BY created_at DESC LIMIT 50',
@@ -364,7 +366,7 @@ router.get('/api/prediction-markets/:id/history', async (req, res) => {
   res.json(history || []);
 });
 
-router.post('/api/predictions/trade', requireAuth, async (req, res) => {
+router.post('predictions/trade', requireAuth, async (req, res) => {
   try {
     const body = req.body || {};
     const account = await getAccountForUser(req.user.userId);
@@ -408,7 +410,7 @@ router.post('/api/predictions/trade', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/predictions/close', requireAuth, async (req, res) => {
+router.post('predictions/close', requireAuth, async (req, res) => {
   try {
     const body = req.body || {};
     const account = await getAccountForUser(req.user.userId);
@@ -441,7 +443,7 @@ router.post('/api/predictions/close', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/predictions/refresh', requireAuth, async (req, res) => {
+router.post('predictions/refresh', requireAuth, async (req, res) => {
   try {
     const pool = getPool();
     const markets = await syncPredictions(pool);
@@ -451,7 +453,7 @@ router.post('/api/predictions/refresh', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/predictions/settle', requireAuth, async (req, res) => {
+router.post('predictions/settle', requireAuth, async (req, res) => {
   try {
     const pool = getPool();
     const settled = await settleResolvedPredictions(pool);
@@ -462,7 +464,7 @@ router.post('/api/predictions/settle', requireAuth, async (req, res) => {
 });
 
 // ---- Orders ----
-router.get('/api/orders', requireAuth, async (req, res) => {
+router.get('orders', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -474,7 +476,7 @@ router.get('/api/orders', requireAuth, async (req, res) => {
 });
 
 // ---- Positions ----
-router.get('/api/positions', requireAuth, async (req, res) => {
+router.get('positions', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -485,7 +487,7 @@ router.get('/api/positions', requireAuth, async (req, res) => {
 });
 
 // ---- Watchlists ----
-router.get('/api/watchlists', requireAuth, async (req, res) => {
+router.get('watchlists', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -496,7 +498,7 @@ router.get('/api/watchlists', requireAuth, async (req, res) => {
   res.json(list || []);
 });
 
-router.post('/api/watchlists', requireAuth, async (req, res) => {
+router.post('watchlists', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -509,7 +511,7 @@ router.post('/api/watchlists', requireAuth, async (req, res) => {
 });
 
 // ---- Businesses ----
-router.get('/api/businesses', requireAuth, async (req, res) => {
+router.get('businesses', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -520,7 +522,7 @@ router.get('/api/businesses', requireAuth, async (req, res) => {
   res.json(list || []);
 });
 
-router.post('/api/businesses', requireAuth, async (req, res) => {
+router.post('businesses', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -532,7 +534,7 @@ router.post('/api/businesses', requireAuth, async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-router.get('/api/businesses/:id', requireAuth, async (req, res) => {
+router.get('businesses/:id', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -545,7 +547,7 @@ router.get('/api/businesses/:id', requireAuth, async (req, res) => {
 });
 
 // ---- Quests ----
-router.get('/api/quests', requireAuth, async (req, res) => {
+router.get('quests', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -557,7 +559,7 @@ router.get('/api/quests', requireAuth, async (req, res) => {
 });
 
 // ---- Messages ----
-router.get('/api/messages', requireAuth, async (req, res) => {
+router.get('messages', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -569,7 +571,7 @@ router.get('/api/messages', requireAuth, async (req, res) => {
 });
 
 // ---- Social ----
-router.post('/api/social/block', requireAuth, async (req, res) => {
+router.post('social/block', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -581,7 +583,7 @@ router.post('/api/social/block', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/api/social/report', requireAuth, async (req, res) => {
+router.post('social/report', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -594,7 +596,7 @@ router.post('/api/social/report', requireAuth, async (req, res) => {
 });
 
 // ---- Alerts ----
-router.get('/api/alerts', requireAuth, async (req, res) => {
+router.get('alerts', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -606,14 +608,14 @@ router.get('/api/alerts', requireAuth, async (req, res) => {
 });
 
 // ---- Admin ----
-router.get('/api/admin', requireAdmin, async (req, res) => {
+router.get('admin', requireAdmin, async (req, res) => {
   const pool = getPool();
   const [users] = await pool.execute('SELECT id, email, display_name, role, created_at FROM users ORDER BY created_at DESC LIMIT 50');
   const [competitions] = await pool.execute('SELECT id, name, status FROM competitions');
   res.json({ users, competitions });
 });
 
-router.post('/api/admin', requireAdmin, async (req, res) => {
+router.post('admin', requireAdmin, async (req, res) => {
   const body = req.body || {};
   if (body.action === 'promote' && body.email && body.role) {
     await promoteUser(body.email, body.role);
@@ -623,7 +625,7 @@ router.post('/api/admin', requireAdmin, async (req, res) => {
 });
 
 // ---- Assets (instruments) ----
-router.get('/api/instruments/search', async (req, res) => {
+router.get('instruments/search', async (req, res) => {
   const pool = getPool();
   const q = (req.query.q || '').toUpperCase();
   const [assets] = await pool.execute(
@@ -634,7 +636,7 @@ router.get('/api/instruments/search', async (req, res) => {
 });
 
 // ---- Profile/avatar ----
-router.post('/api/profile/avatar', requireAuth, async (req, res) => {
+router.post('profile/avatar', requireAuth, async (req, res) => {
   const pool = getPool();
   const account = await getAccountForUser(req.user.userId);
   if (!account) return res.status(404).json({ error: 'No account' });
@@ -644,21 +646,21 @@ router.post('/api/profile/avatar', requireAuth, async (req, res) => {
 });
 
 // ---- Cron health check (no auth) ----
-router.get('/api/cron/health', async (req, res) => {
+router.get('cron/health', async (req, res) => {
   res.json({ ok: true });
 });
 
 // ---- Cron endpoints (require CRON_SECRET Bearer auth) ----
-router.post('/api/cron/tick', requireCronAuth, async (req, res, next) => {
+router.post('cron/tick', requireCronAuth, async (req, res, next) => {
   try { await tickCron(req, res); } catch (e) { next(e); }
 });
-router.post('/api/cron/snapshot', requireCronAuth, async (req, res, next) => {
+router.post('cron/snapshot', requireCronAuth, async (req, res, next) => {
   try { await snapshotCron(req, res); } catch (e) { next(e); }
 });
-router.post('/api/cron/predictions', requireCronAuth, async (req, res, next) => {
+router.post('cron/predictions', requireCronAuth, async (req, res, next) => {
   try { await predictionsCron(req, res); } catch (e) { next(e); }
 });
-router.post('/api/cron/predictions-settle', requireCronAuth, async (req, res, next) => {
+router.post('cron/predictions-settle', requireCronAuth, async (req, res, next) => {
   try { await settleCron(req, res); } catch (e) { next(e); }
 });
 

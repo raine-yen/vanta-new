@@ -2,9 +2,17 @@
 // (Gamma: closed=true, umaResolutionStatus="resolved", outcomePrices winner="1"),
 // pay holders $1 per winning share / $0 for losers into the shared paper cash,
 // zero the positions, and write 'settle' fills.
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { settlePayout } from "@/lib/prediction-math";
-import type { FetchLike } from "@/lib/prediction-sync";
+// MySQL-compatible prediction settlement — accepts duck-typed db or uses MySQL pool.
+const { getPool } = require('./lib/mysql-client');
+const mysqlDuck = require('./lib/mysql-duck');
+import { settlePayout } from "./prediction-math";
+import type { FetchLike } from "./prediction-sync";
+
+function getDb() {
+  const pool = getPool();
+  if (!pool) throw new Error('MySQL not configured');
+  return mysqlDuck.wrapPool(pool);
+}
 
 export interface SettleDb {
   from(table: string): any;
@@ -34,7 +42,7 @@ export function gammaWinner(row: { closed?: boolean; umaResolutionStatus?: strin
 export async function settlePredictionMarkets(
   deps: { db?: SettleDb; fetchImpl?: FetchLike; accountId?: string } = {},
 ): Promise<SettleResult> {
-  const db = deps.db ?? (supabaseAdmin() as unknown as SettleDb);
+  const db = deps.db ?? getDb();
   const fetchImpl = deps.fetchImpl ?? fetch;
 
   // Only markets someone actually holds can need settlement.

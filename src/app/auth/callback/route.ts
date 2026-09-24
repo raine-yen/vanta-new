@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensurePaperAccount } from "@/lib/ensure-paper-account";
-import { supabaseServer } from "@/lib/supabase/server";
 
 function safeNext(value: string | null) {
   return value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
@@ -15,23 +13,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=google_callback_failed", requestUrl.origin));
   }
 
-  const sb = await supabaseServer();
-  const { error: exchangeError } = await sb.auth.exchangeCodeForSession(code);
-  if (exchangeError) {
-    console.error("Google OAuth callback failed", exchangeError.message);
-    return NextResponse.redirect(new URL("/login?error=google_callback_failed", requestUrl.origin));
-  }
+  // Exchange Google code via Express auth endpoint
+  const res = await fetch(`${process.env.APP_URL || "http://localhost:3000"}/api/auth/google/callback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, next }),
+  });
 
-  const { data: userData } = await sb.auth.getUser();
-  if (!userData.user) {
+  if (!res.ok) {
+    console.error("Google OAuth callback failed", await res.text().catch(() => ""));
     return NextResponse.redirect(new URL("/login?error=google_callback_failed", requestUrl.origin));
-  }
-
-  try {
-    await ensurePaperAccount(userData.user, sb);
-  } catch (error) {
-    console.error("Google OAuth account provisioning failed", error);
-    return NextResponse.redirect(new URL("/login?error=account_setup_failed", requestUrl.origin));
   }
 
   return NextResponse.redirect(new URL(next, requestUrl.origin));

@@ -1,6 +1,18 @@
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { fetchYahooPrices, getPrice } from "@/lib/prices";
-import type { Order, Position, Account, OrderSide, OrderType } from "@/lib/types";
+// MySQL-compatible engine — accepts a duck-typed db handle or falls back to MySQL pool.
+// The db parameter is a duck-typed interface: db.from(table).select().eq().maybeSingle().single().insert().update().delete()
+
+const { getPool } = require('./lib/mysql-client');
+const mysqlDuck = require('./lib/mysql-duck');
+
+// Get a duck-typed DB handle
+function getDb() {
+  const pool = getPool();
+  if (!pool) throw new Error('MySQL not configured');
+  return mysqlDuck.wrapPool(pool);
+}
+
+const { fetchYahooPrices, getPrice } = require('./lib/prices');
+import type { Order, Position, Account, OrderSide, OrderType } from "./types";
 
 export interface PlaceOrderInput {
   account: Account;
@@ -25,7 +37,7 @@ export interface PlaceOrderResult {
  * Cash & position checks happen up front (best-effort optimistic locking via DB checks).
  */
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
-  const db = supabaseAdmin();
+  const db = getDb();
   const symbol = input.symbol.toUpperCase();
   const qty = Number(input.qty);
 
@@ -151,7 +163,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
  * Atomically updates cash, position, fills, and the order row.
  */
 export async function fillOrder(order: Order, price: number): Promise<Order | null> {
-  const db = supabaseAdmin();
+  const db = getDb();
   const qty = Number(order.qty);
   const notional = qty * price;
   const now = new Date().toISOString();
@@ -264,7 +276,7 @@ export async function fillOrder(order: Order, price: number): Promise<Order | nu
  * Run by Vercel Cron every minute: evaluate open limit orders and update equity.
  */
 export async function tick(): Promise<{ filled: number; symbolsRefreshed: number; accountsUpdated: number }> {
-  const db = supabaseAdmin();
+  const db = getDb();
 
   let { data: openOrders, error: openOrdersError } = await db
     .from("orders")
@@ -365,7 +377,7 @@ export async function tick(): Promise<{ filled: number; symbolsRefreshed: number
  * Take periodic snapshots of every active account's equity for chart history.
  */
 export async function takeSnapshots(): Promise<number> {
-  const db = supabaseAdmin();
+  const db = getDb();
   const { data: accounts } = await db.from("accounts").select("*").eq("status", "active");
   let n = 0;
   for (const a of (accounts as Account[] | null) ?? []) {
@@ -392,7 +404,7 @@ export async function takeSnapshots(): Promise<number> {
 }
 
 export async function cancelOrder(orderId: string, accountId: string): Promise<boolean> {
-  const db = supabaseAdmin();
+  const db = getDb();
   const { data: order } = await db
     .from("orders")
     .select("*")

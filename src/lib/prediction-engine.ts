@@ -1,6 +1,14 @@
 // Paper prediction trading engine. Follows src/lib/engine.ts conventions:
 // service-role db handle, explicit cash checks, idempotency via client_order_id.
-import { supabaseAdmin } from "@/lib/supabase/admin";
+// Paper prediction trading engine — MySQL-compatible via duck-typed wrapper.
+const { getPool } = require('./lib/mysql-client');
+const mysqlDuck = require('./lib/mysql-duck');
+
+function getDb() {
+  const pool = getPool();
+  if (!pool) throw new Error('MySQL not configured');
+  return mysqlDuck.wrapPool(pool);
+}
 import { fetchUpstreamPredictionMarketState, liveMidpoint, type PredictionMarketRow } from "@/lib/prediction-sync";
 import {
   isOutcome,
@@ -39,7 +47,7 @@ export interface EngineDeps {
 
 /** Buy whole outcome shares for a dollar stake against the shared paper cash. */
 export async function buyPredictionShares(input: PredictionBuyInput, deps: EngineDeps = {}): Promise<EngineResult<BuyResult>> {
-  const db = (deps.db ?? (supabaseAdmin() as unknown as PredictionEngineDb));
+  const db = (deps.db ?? getDb());
   const fetchImpl = deps.fetchImpl ?? fetch;
 
   if (!isOutcome(input.outcome)) return { ok: false, error: "outcome must be yes or no" };
@@ -201,7 +209,7 @@ export interface SellResult {
  * any amount or all shares; proceeds credited to the shared paper cash.
  */
 export async function sellPredictionShares(input: PredictionSellInput, deps: EngineDeps = {}): Promise<EngineResult<SellResult>> {
-  const db = (deps.db ?? (supabaseAdmin() as unknown as PredictionEngineDb));
+  const db = (deps.db ?? getDb());
   const fetchImpl = deps.fetchImpl ?? fetch;
 
   if (!isOutcome(input.outcome)) return { ok: false, error: "outcome must be yes or no" };
