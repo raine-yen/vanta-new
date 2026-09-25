@@ -100,6 +100,10 @@ function startApp() {
     });
   }).catch(err => {
     console.error('Next.js failed to start:', err);
-    process.exit(1);
+    // Fallback: just start Express without Next.js
+    console.log('Starting Express-only mode...');
+    app.listen(publicPort, () => {
+      console.log(`Vanta Express API listening on port ${publicPort} (Next.js unavailable)`);
+    });
   });
 }
