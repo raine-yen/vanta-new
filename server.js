@@ -3,12 +3,13 @@
 // listens on the public PORT for /api/* and /v2/* Express routes.
 
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 
 // ---- Run migrations first ----
-// migrate.mjs is a standalone script; run it via child process
-const migrateProc = exec(`node "${path.join(__dirname, 'scripts', 'migrate.mjs')}"`, {
+// Use execFile with explicit Node path (Hostinger Node.js apps have node at /usr/local/bin/node)
+const migrateProc = execFile('/usr/local/bin/node', [path.join(__dirname, 'scripts', 'migrate.mjs')], {
   cwd: __dirname,
+  env: { ...process.env },
 });
 
 migrateProc.stdout.on('data', data => process.stdout.write(data));
