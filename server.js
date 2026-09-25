@@ -6,8 +6,6 @@ const path = require('path');
 const { exec } = require('child_process');
 
 // ---- Run migrations first ----
-const migrate = require('./scripts/migrate.mjs');
-
 // migrate.mjs is a standalone script; run it via child process
 const migrateProc = exec(`node "${path.join(__dirname, 'scripts', 'migrate.mjs')}"`, {
   cwd: __dirname,
