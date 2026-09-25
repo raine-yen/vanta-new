@@ -6,23 +6,9 @@ const path = require('path');
 const { execFile } = require('child_process');
 
 // ---- Run migrations first ----
-// Use execFile with explicit Node path (Hostinger Node.js apps have node at /usr/local/bin/node)
-const migrateProc = execFile('/usr/local/bin/node', [path.join(__dirname, 'scripts', 'migrate.mjs')], {
-  cwd: __dirname,
-  env: { ...process.env },
-});
-
-migrateProc.stdout.on('data', data => process.stdout.write(data));
-migrateProc.stderr.on('data', data => process.stderr.write(data));
-
-migrateProc.on('exit', code => {
-  if (code !== 0) {
-    console.error('Migration failed. Aborting.');
-    process.exit(code);
-  }
-  console.log('Migrations complete. Starting Vanta...');
-  startApp();
-});
+// Skip migration on startup — run `npm run db:migrate` manually via Hostinger command interface
+// or via phpMyAdmin SQL. The migration script is at scripts/migrate.mjs.
+console.log('Migrations: run manually via `npm run db:migrate` or phpMyAdmin');
 
 function startApp() {
   const express = require('express');
