@@ -3,16 +3,20 @@
 // Records SHA-256 checksums in schema_migrations; refuses to re-apply
 // edited migrations. MySQL 8 required (JSON columns, DATETIME(3)).
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ---- MySQL connection (loaded lazily) ----
 let pool = null;
 
 async function getPool() {
   if (pool) return pool;
-  const mysql = require('mysql2/promise');
+  const mysql = await import('mysql2/promise');
   const host = process.env.DB_HOST || 'localhost';
   const port = parseInt(process.env.DB_PORT || '3306', 10);
   const database = process.env.DB_NAME;
