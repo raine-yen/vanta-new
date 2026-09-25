@@ -88,8 +88,20 @@ function startApp() {
   const publicPort = parseInt(process.env.PORT || '3000', 10);
   const nextPort = parseInt(process.env.NEXT_PORT || '3001', 10);
 
-  // Start Next.js on private loopback port
+  // Start Next.js on private loopback port with a timeout fallback
+  let started = false;
+  const timeout = setTimeout(() => {
+    if (!started) {
+      console.log('Next.js prepare timed out (30s). Starting Express-only mode...');
+      app.listen(publicPort, () => {
+        console.log(`Vanta Express API listening on port ${publicPort} (Next.js unavailable)`);
+      });
+    }
+  }, 30000);
+
   nextApp.prepare().then(() => {
+    started = true;
+    clearTimeout(timeout);
     console.log(`Next.js starting on 127.0.0.1:${nextPort}`);
     const nextServer = express();
     nextServer.listen(nextPort, '127.0.0.1', () => {
@@ -99,6 +111,8 @@ function startApp() {
       });
     });
   }).catch(err => {
+    started = true;
+    clearTimeout(timeout);
     console.error('Next.js failed to start:', err);
     // Fallback: just start Express without Next.js
     console.log('Starting Express-only mode...');
